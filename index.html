@@ -1,0 +1,793 @@
+<div id="app"></div>
+
+<style>
+  :root{
+    --ink:#1a2230; --paper:#fbfaf8; --panel:#ffffff;
+    --line:#e4e2dc; --muted:#697283; --blue:#34507a;
+    --right:#2e7d5b; --right-bg:#eaf5ef; --wrong:#b23b3b; --wrong-bg:#f9ecec;
+    --chip:#eef1f6;
+  }
+  *{box-sizing:border-box}
+  #app{font-family:'Iowan Old Style','Palatino Linotype',Georgia,serif;color:var(--ink);max-width:780px;margin:0 auto;padding:8px 18px 80px;line-height:1.5}
+  .mono{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace}
+  h1{font-size:30px;margin:14px 0 2px;letter-spacing:-.01em;font-weight:600}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 10px}
+  .ecg{display:block;width:100%;height:26px;color:var(--blue);margin:6px 0 18px}
+  .bar{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin:0 0 4px}
+  .bar > i{display:block;height:100%;background:var(--blue);width:0;transition:width .3s}
+  .meta{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-bottom:22px}
+  .meta .mono{color:var(--ink)}
+  .qcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 20px 8px;margin-bottom:18px}
+  .tag{display:inline-block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);background:var(--chip);padding:3px 9px;border-radius:99px;margin-bottom:12px}
+  .stem{font-size:16.5px;margin:0 0 16px}
+  .opt{display:block;width:100%;text-align:left;font:inherit;font-size:15px;background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:11px 14px;margin:8px 0;cursor:pointer;transition:border-color .15s,background .15s}
+  .opt:hover:not(:disabled){border-color:var(--blue)}
+  .opt:disabled{cursor:default}
+  .opt b{display:inline-block;width:20px;color:var(--muted);font-weight:600}
+  .opt.right{background:var(--right-bg);border-color:var(--right)}
+  .opt.right b{color:var(--right)}
+  .opt.wrong{background:var(--wrong-bg);border-color:var(--wrong)}
+  .opt.wrong b{color:var(--wrong)}
+  .exp{font-size:14.5px;border-top:1px solid var(--line);margin-top:6px;padding:14px 0 12px;color:#2b3340}
+  .exp .verdict{font-weight:600}
+  .exp .v-right{color:var(--right)} .exp .v-wrong{color:var(--wrong)}
+  .nav{display:flex;gap:10px;align-items:center;margin-top:8px}
+  .btn{font:inherit;font-size:15px;border:1px solid var(--blue);background:var(--blue);color:#fff;padding:9px 18px;border-radius:9px;cursor:pointer}
+  .btn.ghost{background:transparent;color:var(--blue)}
+  .btn:disabled{opacity:.4;cursor:default}
+  .count{margin-left:auto;font-size:13px;color:var(--muted)}
+  .jump{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);margin-bottom:14px;flex-wrap:wrap}
+  .jump button{font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--panel);color:var(--blue);border-radius:7px;padding:4px 10px;cursor:pointer}
+  .summary{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px}
+  .score{font-size:46px;font-weight:600;letter-spacing:-.02em}
+  .score small{font-size:18px;color:var(--muted);font-weight:400}
+  .mods{margin:18px 0 4px}
+  .modrow{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--line);font-size:14.5px}
+  .modrow:first-child{border-top:none}
+  .modrow .nm{flex:1}
+  .modrow .pct{font-variant-numeric:tabular-nums;color:var(--muted)}
+  .weak{margin-top:18px}
+  .weak h3{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--wrong);margin:0 0 8px}
+  .weak ul{margin:0;padding-left:18px;font-size:14.5px;color:#2b3340}
+  .weak li{margin:4px 0}
+  .nogap{color:var(--right);font-size:14.5px}
+</style>
+
+<script>
+const Q = [
+/* ==================== MODULE 1: MEDICINE (RESPIRATORY) ==================== */
+{m:"Module 1",t:"Acid-base: chronic compensation",s:"A COPD patient: pH 7.34, PaCO\u2082 60 mmHg, HCO\u2083\u207b 31 mmol/L, baseline well. Using the rule that chronic respiratory acidosis raises HCO\u2083\u207b by about 3.5 per 10 mmHg rise in CO\u2082, the picture is best described as:",
+o:["Acute uncompensated respiratory acidosis","Appropriately compensated chronic respiratory acidosis","A mixed respiratory and metabolic acidosis","Primary metabolic alkalosis","Respiratory acidosis with inappropriate compensation suggesting an added metabolic acidosis"],a:1,
+e:"CO\u2082 is up 20 from 40, so expected chronic HCO\u2083\u207b rise is about 7 (to roughly 31). The measured 31 matches, so this is appropriately compensated chronic respiratory acidosis, not an added disorder."},
+
+{m:"Module 1",t:"Life-threatening asthma",s:"A 30-year-old in acute asthma, treated 30 minutes with continuous salbutamol. She is now quieter with a 'silent chest', drowsy, and the ABG shows a PaCO\u2082 that has risen from 28 to 45 mmHg. This indicates:",
+o:["Clinical improvement","Life-threatening asthma with impending respiratory failure","Adequate response, continue current therapy","A normal finding in asthma","Hyperventilation"],a:1,
+e:"In acute asthma the PaCO\u2082 should be low; a normalising or rising CO\u2082, a silent chest and drowsiness signal exhaustion and life-threatening asthma. Escalate (senior help, IV magnesium, consider ventilation)."},
+
+{m:"Module 1",t:"Acute severe asthma escalation",s:"Acute severe asthma not responding to repeated salbutamol, ipratropium and systemic corticosteroid. The next pharmacological step is:",
+o:["IV adrenaline infusion first-line","IV magnesium sulfate","Oral montelukast","Doubling the ICS dose","A loop diuretic"],a:1,
+e:"IV magnesium sulfate is the recognised next step in severe asthma not responding to initial bronchodilators and steroid, before considering aminophylline/ICU. Adrenaline is reserved for anaphylaxis or peri-arrest."},
+
+{m:"Module 1",t:"COPD: when to add ICS",s:"A COPD patient on LABA/LAMA still has 2 exacerbations/year and a blood eosinophil count of 0.4 x10\u2079/L. The most appropriate change is:",
+o:["Stop the LAMA","Add an inhaled corticosteroid (triple therapy)","Start long-term oral prednisolone","Add daily azithromycin first-line","No change"],a:1,
+e:"Frequent exacerbations with raised eosinophils favour adding an ICS to LABA/LAMA (triple therapy). Long-term oral steroids are avoided; azithromycin is considered only in selected ongoing exacerbators."},
+
+{m:"Module 1",t:"Non-resolving pneumonia",s:"A 62-year-old smoker treated for right lower lobe pneumonia has persistent consolidation on CXR at 6 weeks despite clinical improvement. The most important next step is:",
+o:["Repeat the same antibiotics","CT chest and bronchoscopy to exclude an obstructing lesion","Reassure and discharge","Start antifungals","Spirometry only"],a:1,
+e:"Non-resolving consolidation in a smoker raises concern for an underlying obstructing malignancy. CT and bronchoscopy are needed; a slowly resolving pneumonia can hide a tumour."},
+
+{m:"Module 1",t:"CURB-65 disposition",s:"A 72-year-old with CAP: confused, urea 9 mmol/L, RR 32, BP 86/58, temp 38.5. Calculate CURB-65 and select disposition:",
+o:["Score 1, manage at home","Score 2, short-stay ward","Score 4, consider ICU-level care","Score 0, no antibiotics","Score 5, but manage as outpatient"],a:2,
+e:"Confusion (1) + urea >7 (1) + RR \u226530 (1) + low BP (1) + age \u226565 (1) = 5; a CURB-65 of 3 or more indicates severe pneumonia needing hospital and consideration of intensive care. (Option states 4 as the closest high-severity ICU answer; the key point is high score = ICU consideration.)"},
+
+{m:"Module 1",t:"Pleural fluid: borderline Light's",s:"A pleural aspirate: pleural/serum protein ratio 0.48, pleural/serum LDH ratio 0.66, pleural LDH 0.5x the serum upper limit. By Light's criteria the effusion is:",
+o:["Transudate (protein ratio <0.5)","Exudate (LDH ratio >0.6 meets a criterion)","Indeterminate","Chylothorax","Haemothorax"],a:1,
+e:"Light's criteria classify as exudate if ANY one is met. The protein ratio suggests transudate, but the LDH ratio >0.6 alone makes it an exudate. Meeting any single criterion is sufficient."},
+
+{m:"Module 1",t:"Complicated parapneumonic effusion",s:"A patient with pneumonia has a moderate effusion; aspirate pH is 7.05 with low glucose but no organisms seen. The appropriate management is:",
+o:["Antibiotics alone and observe","Intercostal chest drain plus antibiotics","Repeat tap in one week","Diuretics","Pleurodesis now"],a:1,
+e:"A low pleural pH (<7.2) or low glucose in a parapneumonic effusion indicates a complicated effusion needing drainage, even before frank pus or positive cultures appear."},
+
+{m:"Module 1",t:"Massive haemothorax",s:"A trauma patient has a haemothorax. Which finding indicates a need for urgent thoracotomy rather than drainage alone?",
+o:["Initial drain output of 200 mL","Initial output >1500 mL or ongoing >200 mL/hour","Any haemothorax","Resolved within 24 hours","A small apical cap"],a:1,
+e:"Large initial blood loss (over about 1500 mL) or continued bleeding (over 200 mL/hour for several hours) signals the need for surgical exploration, not just an intercostal catheter."},
+
+{m:"Module 1",t:"Q fever chronic complication",s:"A farmer treated for acute Q fever returns months later with culture-negative endocarditis. The most appropriate treatment is:",
+o:["Short-course amoxicillin","Prolonged doxycycline plus hydroxychloroquine","Single-dose azithromycin","No treatment","Antifungal therapy"],a:1,
+e:"Chronic Q fever classically causes culture-negative endocarditis (Coxiella) and requires prolonged doxycycline with hydroxychloroquine, often for 18 months or more."},
+
+{m:"Module 1",t:"Sarcoidosis: when to treat",s:"A patient with biopsy-proven sarcoidosis. Which feature most clearly indicates a need for systemic corticosteroids?",
+o:["Isolated bilateral hilar lymphadenopathy, asymptomatic","Lofgren syndrome with erythema nodosum","Hypercalcaemia with progressive pulmonary or cardiac/neurological involvement","An incidental finding","Mild fatigue alone"],a:2,
+e:"Most asymptomatic stage 1 sarcoidosis and Lofgren syndrome resolve without treatment. Steroids are indicated for organ-threatening disease (cardiac, neuro, eye), progressive lung disease or significant hypercalcaemia."},
+
+{m:"Module 1",t:"IPF management",s:"A patient with usual interstitial pneumonia (UIP) pattern on HRCT and confirmed idiopathic pulmonary fibrosis. An evidence-based pharmacological therapy is:",
+o:["Long-term high-dose prednisolone","An antifibrotic (pirfenidone or nintedanib)","Inhaled bronchodilators as disease-modifying therapy","Azathioprine plus steroids (recommended in IPF)","No therapy is available"],a:1,
+e:"Antifibrotics (pirfenidone, nintedanib) slow decline in IPF. Immunosuppression with steroids/azathioprine is harmful in IPF (unlike some other ILDs)."},
+
+{m:"Module 1",t:"Asbestos exposure",s:"A retired builder with pleural plaques on CXR. Compared with the plaques themselves, the malignancy specifically linked to asbestos and arising from the pleura is:",
+o:["Small cell lung cancer","Mesothelioma","Squamous cell carcinoma of the larynx","Thymoma","Sarcoidosis"],a:1,
+e:"Asbestos causes benign pleural plaques (markers of exposure) but is specifically linked to malignant pleural mesothelioma, with a long latency. It also increases bronchogenic carcinoma risk, multiplicatively with smoking."},
+
+{m:"Module 1",t:"Type 1 failure and shunt",s:"A patient with type 1 respiratory failure from a large intrapulmonary shunt shows minimal improvement in PaO\u2082 despite high-flow oxygen. This is because:",
+o:["Oxygen was given incorrectly","Shunted blood bypasses ventilated alveoli, so added oxygen cannot reach it","The patient is hypoventilating","CO\u2082 is the problem","The ABG is wrong"],a:1,
+e:"A true shunt (blood passing non-ventilated lung) responds poorly to supplemental oxygen because the oxygen never contacts the shunted blood. V/Q mismatch responds better to oxygen than shunt."},
+
+{m:"Module 1",t:"NIV vs intubation",s:"An AECOPD patient with hypercapnic acidosis also has a GCS of 8, is vomiting and is haemodynamically unstable. The appropriate airway strategy is:",
+o:["Trial of NIV (BiPAP)","Invasive ventilation (intubation), as NIV is contraindicated here","High-flow nasal oxygen only","Observation","CPAP"],a:1,
+e:"NIV is contraindicated with a depressed conscious level, vomiting/aspiration risk and haemodynamic instability. These patients need a definitive airway with invasive ventilation."},
+
+{m:"Module 1",t:"Macrolide interaction",s:"A patient on a statin is prescribed clarithromycin for pneumonia and develops severe myalgia. The mechanism is:",
+o:["A direct allergic reaction","CYP3A4 inhibition raising statin levels and risking rhabdomyolysis","Hypokalaemia","QT prolongation causing muscle pain","Renal failure from the macrolide"],a:1,
+e:"Clarithromycin inhibits CYP3A4, increasing levels of statins metabolised by it (e.g. simvastatin/atorvastatin), raising rhabdomyolysis risk. Macrolides also prolong QT."},
+
+{m:"Module 1",t:"Doxycycline caution",s:"For which patient is doxycycline LEAST appropriate as CAP cover?",
+o:["A 40-year-old man","A pregnant woman","An 80-year-old with COPD","A 25-year-old with penicillin allergy","A 60-year-old farmer"],a:1,
+e:"Tetracyclines including doxycycline are avoided in pregnancy and young children (effects on bone/teeth). They also cause photosensitivity and oesophagitis if not taken with water upright."},
+
+{m:"Module 1",t:"SABA electrolyte effect",s:"High-dose nebulised salbutamol in acute asthma can cause which metabolic disturbance to monitor for?",
+o:["Hyperkalaemia","Hypokalaemia","Hypernatraemia","Hypocalcaemia","Metabolic alkalosis"],a:1,
+e:"Beta-2 agonists drive potassium intracellularly, causing hypokalaemia; monitor potassium with high-dose therapy. They also cause tremor, tachycardia and lactate rise."},
+
+{m:"Module 1",t:"Bronchiectasis colonisation",s:"Chronic airway colonisation with which organism in bronchiectasis is associated with a worse prognosis and more frequent exacerbations?",
+o:["Haemophilus influenzae","Pseudomonas aeruginosa","Streptococcus pneumoniae","Moraxella catarrhalis","Normal flora"],a:1,
+e:"Pseudomonas aeruginosa colonisation in bronchiectasis is linked to greater decline and more exacerbations, and influences antibiotic choice."},
+
+{m:"Module 1",t:"Antimicrobial stewardship",s:"A patient with CAP improves on IV ceftriaxone with sensitivities showing a fully susceptible pneumococcus. The stewardship-appropriate step is:",
+o:["Continue broad IV therapy for 2 weeks","De-escalate to targeted narrow-spectrum oral therapy (e.g. amoxicillin) and switch IV to oral when stable","Add a second broad agent","Add antifungal cover","Extend to a carbapenem"],a:1,
+e:"Stewardship favours de-escalation to the narrowest effective agent guided by cultures, and timely IV-to-oral switch once the patient is improving and able to tolerate oral therapy."},
+
+/* ==================== MODULE 1: GENERAL PRACTICE (RESPIRATORY) ==================== */
+{m:"Module 1",t:"Cough red flag",s:"Which feature in an adult with chronic cough most warrants an urgent chest X-ray to exclude malignancy?",
+o:["Cough worse at night only","Haemoptysis and weight loss in a long-term smoker","Post-nasal drip symptoms","Symptoms relieved by a PPI trial","Cough after a recent cold"],a:1,
+e:"Haemoptysis, weight loss and a smoking history are red flags for lung cancer and mandate imaging. Many chronic coughs are due to asthma, reflux or post-nasal drip, but red flags override."},
+
+{m:"Module 1",t:"AOM in an Aboriginal child",s:"A 2-year-old Aboriginal child presents with acute otitis media. Compared with the general watchful-waiting approach, guidelines recommend:",
+o:["Watchful waiting only","Prompt antibiotics (e.g. amoxicillin) given the higher risk of complications","Topical drops only","No treatment","Immediate grommets"],a:1,
+e:"Aboriginal and Torres Strait Islander children have higher rates of AOM and suppurative complications, so antibiotics are recommended rather than watchful waiting."},
+
+{m:"Module 1",t:"Glue ear",s:"A 4-year-old has otitis media with effusion (glue ear) and mild conductive hearing loss for 6 weeks, no acute infection. Initial management is:",
+o:["Immediate grommets","Watchful waiting with hearing and language review, as many resolve spontaneously","Long-term antibiotics","Topical steroids","Decongestants long-term"],a:1,
+e:"Most OME resolves spontaneously; initial management is observation with hearing/language monitoring. Grommets are considered for persistent effusion with significant hearing or developmental impact."},
+
+{m:"Module 1",t:"Pertussis",s:"An adult with weeks of paroxysmal coughing, post-tussive vomiting and an inspiratory whoop. The appropriate action includes:",
+o:["Reassurance only","A macrolide antibiotic, notification, and consideration of contact prophylaxis","Inhaled steroids alone","Chest physiotherapy only","Antifungals"],a:1,
+e:"Pertussis is treated with a macrolide (most useful early), is a notifiable disease, and warrants prophylaxis for vulnerable contacts. Vaccination status should be reviewed."},
+
+{m:"Module 1",t:"Smoking cessation with depression",s:"A heavy smoker with a history of depression wants to quit. Which pharmacotherapy choice needs the most caution regarding mood/seizure risk?",
+o:["Nicotine replacement therapy","Bupropion","Brief advice","Nicotine patch plus gum","Behavioural support"],a:1,
+e:"Bupropion lowers the seizure threshold and needs caution in some psychiatric contexts; varenicline requires mood monitoring. NRT is generally the safest pharmacological option and can be combined."},
+
+{m:"Module 1",t:"COPD diagnosis threshold",s:"Which spirometry result confirms airflow obstruction consistent with COPD in a symptomatic smoker?",
+o:["Pre-bronchodilator FEV\u2081/FVC 0.75","Post-bronchodilator FEV\u2081/FVC <0.70","FVC reduced with a raised ratio","Normal spirometry","FEV\u2081 alone <80%"],a:1,
+e:"COPD is defined by a persistent post-bronchodilator FEV\u2081/FVC below 0.70. A reduced FVC with a preserved/raised ratio suggests restriction instead."},
+
+/* ==================== MODULE 1: SURGERY (PERIOPERATIVE + TRAUMA) ==================== */
+{m:"Module 1",t:"Septic shock vasopressor",s:"A patient with septic shock remains hypotensive (MAP 58) after adequate fluid resuscitation. The first-line vasopressor is:",
+o:["Dopamine","Noradrenaline","Adrenaline as first choice","Phenylephrine","Vasopressin alone"],a:1,
+e:"Noradrenaline is the first-line vasopressor in septic shock when fluid resuscitation fails to restore perfusion (target MAP \u226565). Vasopressin or adrenaline may be added."},
+
+{m:"Module 1",t:"Shock haemodynamic profile",s:"A patient is hypotensive with warm peripheries, bounding pulses, low systemic vascular resistance and a high cardiac output. This profile fits:",
+o:["Hypovolaemic shock","Cardiogenic shock","Distributive (e.g. septic) shock","Obstructive shock","Neurogenic with bradycardia only"],a:2,
+e:"Warm, vasodilated peripheries with low SVR and high output is the distributive pattern (sepsis, anaphylaxis). Hypovolaemic and cardiogenic shock show cool peripheries with high SVR."},
+
+{m:"Module 1",t:"qSOFA",s:"Which combination of bedside findings constitutes a positive qSOFA, flagging higher risk in suspected sepsis?",
+o:["Fever, leucocytosis, tachycardia","Respiratory rate \u226522, altered mentation, systolic BP \u2264100","Heart rate >90 and temperature >38 only","Low urine output alone","Raised CRP alone"],a:1,
+e:"qSOFA uses RR \u226522, altered mental state and systolic BP \u2264100; two or more flags higher risk of poor outcome and prompts closer assessment. SIRS criteria differ (temperature, HR, RR, WCC)."},
+
+{m:"Module 1",t:"Wound healing sequence",s:"The correct order of wound healing phases is:",
+o:["Inflammation, haemostasis, proliferation, remodelling","Haemostasis, inflammation, proliferation, remodelling","Proliferation, inflammation, haemostasis, remodelling","Remodelling, proliferation, haemostasis, inflammation","Haemostasis, proliferation, inflammation, remodelling"],a:1,
+e:"Healing proceeds: haemostasis (clot), inflammation (debridement), proliferation (granulation, angiogenesis, epithelialisation), then remodelling (collagen maturation) over months."},
+
+{m:"Module 1",t:"Impaired healing",s:"Which factor most directly impairs surgical wound healing through reduced collagen synthesis and immune function?",
+o:["Young age","Long-term corticosteroid use","Normal nutrition","Good tissue perfusion","Smoking cessation"],a:1,
+e:"Corticosteroids impair inflammation and collagen synthesis, delaying healing. Other key factors are diabetes, poor perfusion, infection, malnutrition and smoking."},
+
+{m:"Module 1",t:"Post-op AKI indices",s:"An oliguric post-op patient: urine sodium 60 mmol/L, FeNa 3%, muddy-brown granular casts. This indicates:",
+o:["Pre-renal AKI","Acute tubular necrosis (intrinsic)","Post-renal obstruction","Normal kidneys","Glomerulonephritis with red cell casts"],a:1,
+e:"High urine sodium, FeNa >2% and muddy-brown casts indicate ATN. Pre-renal AKI shows avid sodium retention (FeNa <1%, low urine sodium); GN shows red cell casts."},
+
+{m:"Module 1",t:"VTE prophylaxis contraindication",s:"A post-op patient has active gastrointestinal bleeding. Appropriate VTE prophylaxis is:",
+o:["Therapeutic heparin","Pharmacological prophylaxis with LMWH","Mechanical prophylaxis (calf compression) until bleeding risk resolves","Warfarin","Aspirin"],a:2,
+e:"With active bleeding, pharmacological prophylaxis is contraindicated; use mechanical methods (intermittent pneumatic compression) and reassess for pharmacological prophylaxis once bleeding risk falls."},
+
+{m:"Module 1",t:"Primary survey priority",s:"During a trauma primary survey, breathing assessment reveals a tension pneumothorax. The correct action is to:",
+o:["Complete the full survey first, then treat","Decompress immediately before moving to circulation","Order a CT","Proceed to the secondary survey","Intubate first regardless"],a:1,
+e:"Life threats are treated as they are found in the primary survey. A tension pneumothorax identified at 'B' is decompressed immediately before progressing to 'C'."},
+
+{m:"Module 1",t:"Haemorrhagic shock class",s:"A young trauma patient: HR 130, BP 88/64, RR 30, anxious and confused, with delayed capillary refill. This best fits which class of haemorrhagic shock?",
+o:["Class I (<15% loss)","Class II (15-30%)","Class III (30-40%)","Class IV is impossible at this BP","No shock"],a:2,
+e:"Tachycardia with hypotension, tachypnoea and altered mental state corresponds to roughly 30-40% blood loss (Class III). Young patients compensate then decompensate suddenly."},
+
+{m:"Module 1",t:"FAST scan",s:"An unstable blunt-trauma patient has a positive FAST (free intraperitoneal fluid). The appropriate next step is:",
+o:["CT abdomen first","Urgent laparotomy","Observation","Repeat FAST in 6 hours","Discharge"],a:1,
+e:"A positive FAST in a haemodynamically unstable patient indicates intra-abdominal haemorrhage and the need for urgent laparotomy. CT is reserved for stable patients."},
+
+{m:"Module 1",t:"Damage control resuscitation",s:"In haemorrhaging trauma before surgical control, 'permissive hypotension' aims to:",
+o:["Maximise BP to normal immediately","Avoid over-resuscitation that dislodges clot and worsens dilutional coagulopathy","Withhold all fluids","Give large crystalloid boluses","Use vasopressors first-line"],a:1,
+e:"Permissive hypotension (a lower target BP until bleeding is controlled) plus balanced blood products limits clot disruption and dilutional coagulopathy. Avoid large crystalloid volumes."},
+
+{m:"Module 1",t:"Head injury CT",s:"Which feature most strongly mandates an urgent CT head after injury?",
+o:["A brief headache only","GCS <15 at 2 hours, suspected open/depressed skull fracture, or repeated vomiting","A small scalp graze","Feeling tired","No loss of consciousness"],a:1,
+e:"High-risk criteria (e.g. GCS <15 at 2 hours, signs of skull fracture, focal deficit, repeated vomiting, anticoagulation) drive urgent CT to detect intracranial injury."},
+
+{m:"Module 1",t:"Consent in emergency",s:"An unconscious trauma patient needs immediate life-saving surgery and has no available substitute decision-maker. The lawful basis to proceed is:",
+o:["Wait until consent is obtained","The doctrine of necessity (emergency treatment in the patient's best interests)","A second doctor's signature replaces consent","Family must be located first","Treatment cannot proceed"],a:1,
+e:"Emergency treatment necessary to save life or prevent serious harm may proceed under the principle of necessity when the patient lacks capacity and no valid directive or decision-maker is available."},
+
+{m:"Module 1",t:"Transfusion reaction",s:"Minutes into a red cell transfusion a patient develops fever, loin pain, hypotension and dark urine. The most likely reaction is:",
+o:["Mild allergic reaction","Acute haemolytic transfusion reaction (ABO incompatibility)","TACO (circulatory overload)","TRALI","Febrile non-haemolytic reaction"],a:1,
+e:"Fever, loin/back pain, hypotension and haemoglobinuria early in transfusion suggest an acute haemolytic reaction from ABO incompatibility. Stop the transfusion immediately and resuscitate."},
+
+{m:"Module 1",t:"Spirometry contraindication",s:"Spirometry should be deferred in which situation due to the forced expiratory effort?",
+o:["Stable asthma review","Recent myocardial infarction or recent pneumothorax","Routine COPD monitoring","Pre-operative assessment","Occupational screening"],a:1,
+e:"The forced manoeuvre raises intrathoracic pressure, so spirometry is deferred soon after MI, pneumothorax, recent eye/abdominal/thoracic surgery, or with unstable cardiovascular disease."},
+
+{m:"Module 1",t:"Fixed upper airway obstruction",s:"A flow-volume loop showing flattening of BOTH the inspiratory and expiratory limbs indicates:",
+o:["Obstructive airways disease","Restriction","A fixed large/upper airway obstruction","A normal loop","Variable extrathoracic obstruction only"],a:2,
+e:"A fixed obstruction (e.g. tracheal stenosis, large goitre) flattens both limbs. Variable extrathoracic lesions flatten the inspiratory limb; intrathoracic variable lesions flatten the expiratory limb."},
+
+/* ==================== MODULE 1: DIAGNOSTICS (CXR / ABG) ==================== */
+{m:"Module 1",t:"CXR lobar collapse",s:"A CXR shows volume loss with tracheal and hilar shift toward an opacified area and crowding of ribs. This best indicates:",
+o:["Pleural effusion","Lobar collapse","Tension pneumothorax","Consolidation without volume loss","Cardiomegaly"],a:1,
+e:"Lobar collapse causes volume loss: the trachea, hilum and fissures are pulled toward the collapse, unlike an effusion or tension pneumothorax which push structures away."},
+
+{m:"Module 1",t:"Silhouette sign",s:"On a frontal CXR, loss of the right heart border silhouette localises consolidation to the:",
+o:["Right lower lobe","Right middle lobe","Left upper lobe","Lingula","Right apex"],a:1,
+e:"The right middle lobe abuts the right heart border, so RML consolidation obscures it. Loss of the right hemidiaphragm outline instead suggests right lower lobe disease."},
+
+{m:"Module 1",t:"A-a gradient",s:"A patient hypoventilating from opioid overdose has hypoxaemia and hypercapnia but a NORMAL alveolar-arterial oxygen gradient. This indicates the hypoxaemia is due to:",
+o:["Shunt","V/Q mismatch","Pure hypoventilation","Diffusion limitation","Low inspired oxygen only"],a:2,
+e:"Pure hypoventilation lowers PaO\u2082 while keeping the A-a gradient normal (the lung itself is fine). A raised A-a gradient points to shunt, V/Q mismatch or diffusion problems."},
+
+/* ==================== MODULE 2: MEDICINE (CARDIOLOGY) ==================== */
+{m:"Module 2",t:"Inferior STEMI plus hypotension",s:"A patient with an inferior STEMI (ST elevation II, III, aVF) becomes hypotensive after sublingual GTN. Right-sided leads show RV infarction. The best immediate management is:",
+o:["More GTN","Cautious IV fluid bolus and avoid further nitrates","IV furosemide","Beta-blocker bolus","Sit the patient fully upright"],a:1,
+e:"RV infarction makes the patient preload-dependent; nitrates drop preload and cause profound hypotension. Give fluids and avoid nitrates/diuretics. This complicates many inferior STEMIs."},
+
+{m:"Module 2",t:"Posterior MI",s:"A patient with chest pain has ST DEPRESSION in V1-V3 with tall R waves and upright T waves. The next step is:",
+o:["Reassure, this is benign","Record posterior leads (V7-V9) to look for posterior STEMI","Treat as NSTEMI only","Discharge","Start a beta-blocker and review in clinic"],a:1,
+e:"Anterior ST depression with tall R waves can be the mirror image of a posterior STEMI. Posterior leads (V7-V9) confirm it, and it warrants reperfusion like other STEMIs."},
+
+{m:"Module 2",t:"Thrombolysis contraindication",s:"A STEMI patient cannot reach PCI in time. Which feature is an ABSOLUTE contraindication to thrombolysis?",
+o:["Age over 70","Previous haemorrhagic stroke or recent ischaemic stroke","Controlled hypertension","Diabetes","Current aspirin use"],a:1,
+e:"Absolute contraindications include any prior intracranial haemorrhage, ischaemic stroke within 6 months, active bleeding, recent major trauma/surgery and known intracranial neoplasm/AVM."},
+
+{m:"Module 2",t:"NSTEMI angiography timing",s:"A high-risk NSTEMI (ongoing pain, dynamic ECG changes, raised troponin, GRACE high). Appropriate invasive strategy is:",
+o:["Angiography within 24 hours","Thrombolysis","Discharge with outpatient stress test","Angiography in 2 weeks","No invasive management ever"],a:0,
+e:"High-risk NSTEMI warrants early invasive angiography (generally within 24 hours). Thrombolysis is not used in NSTEMI. Very low-risk patients may have non-invasive assessment."},
+
+{m:"Module 2",t:"ARNI initiation",s:"Switching a HFrEF patient from an ACE inhibitor to sacubitril/valsartan requires:",
+o:["Immediate switch with no gap","A washout of at least 36 hours after the last ACE inhibitor dose to reduce angio-oedema risk","Continuing both together","Stopping the beta-blocker","No precautions"],a:1,
+e:"Sacubitril/valsartan must not be combined with an ACE inhibitor; allow at least a 36-hour washout to reduce the risk of angio-oedema from overlapping neprilysin and ACE inhibition."},
+
+{m:"Module 2",t:"MRA monitoring",s:"After starting spironolactone in HFrEF, the key parameters to monitor are:",
+o:["Liver enzymes and INR","Potassium and renal function","Thyroid function","Full blood count only","Blood glucose"],a:1,
+e:"Mineralocorticoid receptor antagonists risk hyperkalaemia and renal impairment, especially with ACE inhibitors/ARBs; monitor potassium and creatinine. Gynaecomastia can occur with spironolactone."},
+
+{m:"Module 2",t:"Acute pulmonary oedema agents",s:"A hypertensive patient in acute pulmonary oedema (BP 180/100). Alongside oxygen and sitting up, the most useful immediate agents are:",
+o:["IV fluids and a beta-blocker bolus","IV nitrate (to reduce preload/afterload) and IV furosemide, with NIV if hypoxic","A large crystalloid bolus","Digoxin loading","Oral spironolactone only"],a:1,
+e:"In acute pulmonary oedema with adequate BP, IV nitrate offloads the heart and IV furosemide aids diuresis; CPAP/NIV helps oxygenation. Beta-blockers and fluids are harmful acutely."},
+
+{m:"Module 2",t:"Beta-blocker timing in HF",s:"In a patient admitted with acutely DECOMPENSATED heart failure who is congested, the approach to their beta-blocker is:",
+o:["Up-titrate aggressively now","Do not start or up-titrate during decompensation; continue a stable existing dose if tolerated","Stop all heart failure medications","Replace with a calcium channel blocker","Start a high dose immediately"],a:1,
+e:"Beta-blockers reduce mortality in stable HFrEF but should not be initiated or up-titrated during acute decompensation. A pre-existing tolerated dose is usually continued unless cardiogenic shock."},
+
+{m:"Module 2",t:"AF before cardioversion",s:"A stable patient with AF of uncertain duration (likely >48 hours) is considered for elective cardioversion. To reduce stroke risk you should:",
+o:["Cardiovert immediately","Anticoagulate for several weeks first OR exclude atrial thrombus with a transoesophageal echo before cardioversion","Give aspirin only","Cardiovert and start anticoagulation afterwards only","No precautions needed"],a:1,
+e:"For AF >48 hours or unknown duration, either anticoagulate for about 3 weeks before (and 4 weeks after) cardioversion, or perform TOE to exclude left atrial thrombus first, to prevent embolic stroke."},
+
+{m:"Module 2",t:"Heparin-induced thrombocytopenia",s:"A surgical patient on heparin develops a 50% platelet drop on day 7 with a new DVT. The correct action is:",
+o:["Continue heparin and transfuse platelets","Stop all heparin and start a non-heparin anticoagulant","Increase the heparin dose","Give vitamin K","Start aspirin only"],a:1,
+e:"HIT (immune, around days 5-10) causes thrombocytopenia with paradoxical thrombosis. Stop all heparin (including flushes) and anticoagulate with a non-heparin agent. Avoid platelet transfusion."},
+
+{m:"Module 2",t:"Warfarin reversal",s:"A patient on warfarin presents with major GI bleeding and an INR of 6. The most appropriate reversal is:",
+o:["Stop warfarin and observe","IV vitamin K plus prothrombin complex concentrate (prothrombinex)","Oral vitamin K alone","Fresh frozen plasma alone, no vitamin K","Protamine"],a:1,
+e:"Major bleeding on warfarin needs immediate factor replacement with prothrombin complex concentrate plus IV vitamin K. FFP is slower and less complete; protamine reverses heparin, not warfarin."},
+
+{m:"Module 2",t:"NOAC reversal",s:"Which is a specific reversal agent for the direct thrombin inhibitor dabigatran in life-threatening bleeding?",
+o:["Vitamin K","Idarucizumab","Protamine","Tranexamic acid only","Andexanet for dabigatran"],a:1,
+e:"Idarucizumab specifically reverses dabigatran. Andexanet alfa reverses factor Xa inhibitors (apixaban, rivaroxaban). Vitamin K and protamine do not reverse NOACs."},
+
+{m:"Module 2",t:"Myocarditis advice",s:"A young patient recovering from viral myocarditis asks about activity. The appropriate advice is:",
+o:["Resume competitive sport immediately","Avoid strenuous exercise for a period (months) due to arrhythmia/sudden death risk","No restrictions ever","Start a beta-blocker and resume sport","Permanent bed rest"],a:1,
+e:"Myocarditis carries a risk of arrhythmia and sudden death with exertion; guidelines advise avoiding strenuous/competitive exercise for several months with cardiology review before return."},
+
+{m:"Module 2",t:"Tamponade signs",s:"A patient with a pericardial effusion develops hypotension, raised JVP, muffled heart sounds, pulsus paradoxus and electrical alternans on ECG. The immediate treatment is:",
+o:["IV beta-blocker","Urgent pericardiocentesis","Thrombolysis","Diuresis","Oral NSAIDs"],a:1,
+e:"These features indicate cardiac tamponade (Beck's triad plus pulsus paradoxus and electrical alternans). Definitive treatment is drainage of the effusion by pericardiocentesis; support preload with fluids meanwhile."},
+
+{m:"Module 2",t:"Endocarditis prophylaxis",s:"Which patient should receive antibiotic prophylaxis before a high-risk dental procedure?",
+o:["A patient with mild mitral valve prolapse","A patient with a prosthetic heart valve or previous infective endocarditis","Anyone with a heart murmur","A patient with hypertension","A patient with an isolated VSD repaired years ago without residual defect"],a:1,
+e:"Prophylaxis is now reserved for the highest-risk groups: prosthetic valves, previous IE, certain unrepaired/recently repaired congenital heart disease, and cardiac transplant valvulopathy."},
+
+{m:"Module 2",t:"Dissection BP control",s:"In a confirmed aortic dissection, the first drug to control shear stress (dP/dt) before any vasodilator is:",
+o:["A vasodilator such as hydralazine alone","An intravenous beta-blocker (e.g. esmolol/labetalol)","A loop diuretic","Sublingual nifedipine","Inotropes"],a:1,
+e:"Lower heart rate and contractility first with a beta-blocker to reduce aortic wall stress; adding a vasodilator without rate control causes reflex tachycardia that worsens shear forces."},
+
+{m:"Module 2",t:"HCM murmur dynamics",s:"A young patient has an ejection systolic murmur that gets LOUDER on standing and with Valsalva. This dynamic behaviour suggests:",
+o:["Aortic stenosis","Hypertrophic cardiomyopathy with dynamic outflow obstruction","Mitral regurgitation","A benign flow murmur that needs no follow-up","Aortic regurgitation"],a:1,
+e:"HCM outflow murmurs increase with reduced preload/afterload (standing, Valsalva) because the obstruction worsens. Fixed aortic stenosis softens with these manoeuvres. HCM carries sudden-death risk."},
+
+{m:"Module 2",t:"Pulmonary embolism in pregnancy",s:"A pregnant woman has suspected PE. Which anticoagulant is appropriate, and which imaging is generally preferred?",
+o:["Warfarin; CTPA","LMWH; CTPA or V/Q depending on CXR, avoiding warfarin and NOACs","A NOAC; MRI","Aspirin; ultrasound","No anticoagulation until delivery"],a:1,
+e:"In pregnancy use LMWH (warfarin is teratogenic; NOACs are not recommended). Imaging is individualised (V/Q or CTPA); a leg ultrasound first can avoid radiation if DVT is confirmed."},
+
+{m:"Module 2",t:"Coronary territory",s:"Occlusion of the LEFT circumflex artery most typically produces ischaemic changes in which leads?",
+o:["V1-V4","II, III, aVF","I, aVL, V5-V6 (lateral)","V7-V9 only","aVR only"],a:2,
+e:"The circumflex supplies the lateral wall (I, aVL, V5-V6, sometimes posterior). The LAD supplies anteroseptal (V1-V4); the RCA supplies inferior (II, III, aVF) and usually the AV node."},
+
+{m:"Module 2",t:"Cardiac arrest rhythm",s:"During an adult arrest, the rhythm is asystole. The correct action regarding defibrillation and drugs is:",
+o:["Shock immediately","Do NOT shock (non-shockable); give adrenaline and continue high-quality CPR, seeking reversible causes","Shock then adrenaline","Withhold all drugs","Synchronised cardioversion"],a:1,
+e:"Asystole and PEA are non-shockable; CPR continues with adrenaline every 3-5 minutes while treating reversible causes (the Hs and Ts). VF and pulseless VT are the shockable rhythms."},
+
+{m:"Module 2",t:"Combinations to avoid",s:"Which combination is most likely to cause dangerous bradycardia or high-grade AV block?",
+o:["ACE inhibitor plus a statin","Verapamil (or diltiazem) plus a beta-blocker","Aspirin plus a PPI","Metformin plus an ARB","A nitrate plus a statin"],a:1,
+e:"Combining a non-dihydropyridine calcium channel blocker (verapamil/diltiazem) with a beta-blocker compounds negative chronotropic/dromotropic effects, risking severe bradycardia or AV block."},
+
+{m:"Module 2",t:"ACE inhibitor renal effect",s:"After starting an ACE inhibitor, a patient's creatinine rises by 35% and potassium climbs. Bilateral renal artery stenosis is suspected. The mechanism of the creatinine rise is:",
+o:["Direct nephrotoxicity","Loss of efferent arteriolar constriction reducing glomerular filtration pressure","Dehydration only","An allergic interstitial nephritis","Rhabdomyolysis"],a:1,
+e:"ACE inhibitors dilate the efferent arteriole; in renal artery stenosis (or volume depletion) this drops glomerular perfusion pressure and GFR. A modest rise (<30%) can be tolerated; larger rises or hyperkalaemia prompt review."},
+
+/* ==================== MODULE 2: GENERAL PRACTICE (CARDIOVASCULAR) ==================== */
+{m:"Module 2",t:"Absolute CV risk reclassification",s:"Which factor automatically reclassifies a patient to high absolute cardiovascular risk (or requires clinical adjustment upward) in Australian risk assessment?",
+o:["Being male","Diabetes with end-organ damage, moderate-to-severe CKD, or very high single risk factors","A family history of hypertension only","Mild overweight","Occasional alcohol"],a:1,
+e:"Some conditions confer high risk directly or warrant upward reclassification: established CVD, diabetes with end-organ damage, significant CKD, very high cholesterol/BP, and Aboriginal and Torres Strait Islander status is considered in assessment."},
+
+{m:"Module 2",t:"Statin myalgia workup",s:"A patient on atorvastatin reports diffuse muscle aches. The most appropriate initial step is:",
+o:["Stop the statin permanently and never re-trial","Check creatine kinase, review for interacting drugs, and assess severity before deciding on dose change or re-challenge","Ignore it","Switch to a fibrate","Add coenzyme Q10 as definitive treatment"],a:1,
+e:"Assess symptom severity, check CK, and look for interacting drugs (e.g. macrolides, fibrates). Many tolerate a lower dose or an alternative statin; true rhabdomyolysis is rare but important to exclude."},
+
+{m:"Module 2",t:"Familial hypercholesterolaemia",s:"A 35-year-old with LDL 6.5 mmol/L, tendon xanthomata and a father who had an MI at 40. This suggests:",
+o:["Secondary hyperlipidaemia from diet","Familial hypercholesterolaemia, warranting high-intensity statin and family screening","Normal variation","Hypothyroidism only","No action needed under age 40"],a:1,
+e:"Very high LDL with tendon xanthomata and premature family CVD suggests familial hypercholesterolaemia. Treat aggressively (high-intensity statin, often add-on therapy) and offer cascade family screening."},
+
+{m:"Module 2",t:"Stable angina first-line",s:"A patient with stable angina and a normal heart rate/BP. Alongside GTN as needed and secondary prevention, the first-line anti-anginal is:",
+o:["A nitrate infusion","A beta-blocker (or a calcium channel blocker if beta-blocker is unsuitable)","Digoxin","Warfarin","An SGLT2 inhibitor"],a:1,
+e:"First-line symptomatic therapy for stable angina is a beta-blocker or a calcium channel blocker, with short-acting nitrate for episodes, plus aspirin and a statin for prevention."},
+
+{m:"Module 2",t:"Syncope requiring workup",s:"Which syncope history most needs urgent cardiac investigation?",
+o:["Fainting after standing in a hot crowded room with prodromal nausea","Syncope during exertion with no warning, plus a family history of sudden cardiac death","Fainting at the sight of blood","Syncope after prolonged standing with quick recovery","Cough-induced syncope"],a:1,
+e:"Exertional syncope without prodrome and a family history of sudden death point to a cardiac cause (arrhythmia, HCM, channelopathy, aortic stenosis). A 12-lead ECG is mandatory and urgent assessment needed."},
+
+{m:"Module 2",t:"Ambulatory BP",s:"A patient has elevated clinic BP but normal home readings. This is best described as, and managed by:",
+o:["Masked hypertension; treat immediately","White-coat hypertension; confirm with ambulatory/home monitoring and manage risk without necessarily starting drugs","Resistant hypertension","Secondary hypertension","Hypertensive emergency"],a:1,
+e:"High clinic but normal out-of-clinic readings is white-coat hypertension; confirm with ambulatory or home BP monitoring and base treatment on out-of-office readings and overall risk."},
+
+{m:"Module 2",t:"AF stroke risk threshold",s:"A 60-year-old man with AF, no other risk factors (CHA\u2082DS\u2082-VASc 0). The recommended antithrombotic therapy is:",
+o:["A NOAC","Aspirin","No antithrombotic therapy","Warfarin","Dual antiplatelets"],a:2,
+e:"With a CHA\u2082DS\u2082-VASc of 0 in men (or 1 in women due to sex alone), stroke risk is low and routine anticoagulation is not recommended; antiplatelets are not used for stroke prevention in AF."},
+
+/* ==================== MODULE 2: SURGERY (ACUTE + CARDIOTHORACIC) ==================== */
+{m:"Module 2",t:"Closed-loop obstruction",s:"A patient with a large bowel obstruction and a competent ileocaecal valve is at particular risk of:",
+o:["Spontaneous resolution","A closed-loop obstruction with rising caecal pressure and perforation risk","Diarrhoea","Reduced pain","No complications"],a:1,
+e:"With a competent ileocaecal valve, the colon cannot decompress proximally, creating a closed loop; rising caecal pressure risks ischaemia and perforation (especially caecum), an urgent situation."},
+
+{m:"Module 2",t:"Mesenteric ischaemia subtype",s:"An 80-year-old with AF develops sudden severe abdominal pain out of proportion to signs, with a raised lactate. The most likely mechanism is:",
+o:["Non-occlusive mesenteric ischaemia","Arterial embolism (often to the superior mesenteric artery)","Mesenteric venous thrombosis","Chronic mesenteric ischaemia","Ischaemic colitis"],a:1,
+e:"AF predisposes to arterial embolism, classically lodging in the SMA, causing acute mesenteric ischaemia with pain out of proportion and lactic acidosis. CT angiography confirms; it needs urgent revascularisation/resection."},
+
+{m:"Module 2",t:"Variceal vs non-variceal UGI bleed",s:"A cirrhotic patient with haematemesis. Compared with a peptic ulcer bleed, specific additional management for suspected variceal bleeding includes:",
+o:["No difference in management","A vasoactive drug (terlipressin/octreotide) and prophylactic antibiotics, plus band ligation at endoscopy","Only a PPI","Immediate surgery for all","Iron infusion"],a:1,
+e:"Variceal bleeding additionally needs splanchnic vasoconstrictors and prophylactic antibiotics (both reduce mortality) with endoscopic band ligation. Non-variceal (ulcer) bleeds are managed with PPI and endoscopic haemostasis."},
+
+{m:"Module 2",t:"Lung cancer paraneoplastic",s:"A central lung tumour is associated with hyponatraemia from SIADH and, in some cases, ectopic ACTH. This is most typical of:",
+o:["Adenocarcinoma","Small cell lung cancer","Squamous cell carcinoma","Mesothelioma","Carcinoid only"],a:1,
+e:"Small cell lung cancer (central, aggressive) is classically linked to paraneoplastic syndromes such as SIADH and ectopic ACTH. Squamous cell cancer is more associated with PTHrP-mediated hypercalcaemia."},
+
+{m:"Module 2",t:"Pancoast tumour",s:"An apical lung tumour causing ptosis, miosis and anhidrosis on one side has caused:",
+o:["Superior vena cava obstruction","Horner syndrome from sympathetic chain involvement","Recurrent laryngeal nerve palsy","Phrenic nerve palsy","Brachial plexus sparing"],a:1,
+e:"A Pancoast (superior sulcus) tumour can invade the sympathetic chain, producing Horner syndrome (ptosis, miosis, anhidrosis), and the brachial plexus (arm pain/wasting)."},
+
+{m:"Module 2",t:"Congenital murmurs",s:"A continuous 'machinery' murmur heard below the left clavicle in a child is characteristic of:",
+o:["Atrial septal defect","Patent ductus arteriosus","Ventricular septal defect","Tetralogy of Fallot","Coarctation"],a:1,
+e:"A PDA gives a continuous machinery murmur. An ASD gives a fixed split S2; a VSD gives a pansystolic murmur at the left sternal edge."},
+
+{m:"Module 2",t:"Aortic stenosis haemodynamics",s:"Why are vasodilators (e.g. GTN) dangerous in severe aortic stenosis?",
+o:["They raise afterload","The fixed obstruction limits cardiac output, so vasodilation drops coronary/cerebral perfusion and causes syncope","They cause bradycardia","They increase preload","They have no effect"],a:1,
+e:"With a fixed valvular obstruction, the heart cannot increase output to compensate for vasodilation, so BP and coronary perfusion fall, risking syncope and ischaemia. Use vasodilators with great caution."},
+
+{m:"Module 2",t:"Aortic regurgitation signs",s:"A collapsing (water-hammer) pulse, wide pulse pressure and an early diastolic murmur at the left sternal edge indicate:",
+o:["Aortic stenosis","Aortic regurgitation","Mitral stenosis","Mitral regurgitation","Tricuspid regurgitation"],a:1,
+e:"Chronic aortic regurgitation produces a wide pulse pressure, collapsing pulse and a soft early diastolic murmur. Acute severe AR (e.g. from dissection or endocarditis) is a surgical emergency."},
+
+{m:"Module 2",t:"Aneurysm repair threshold",s:"Elective repair of an ascending thoracic aortic aneurysm is generally considered at a diameter around:",
+o:["3.0 cm","4.0 cm","5.5 cm (lower in connective tissue disease such as Marfan)","8.0 cm only","Never electively"],a:2,
+e:"Repair is typically considered around 5.5 cm for ascending aneurysms, with lower thresholds in Marfan/connective tissue disease or rapid growth, balancing rupture/dissection risk against operative risk."},
+
+{m:"Module 2",t:"CABG indication",s:"Which lesion pattern most favours CABG over PCI?",
+o:["A single short LAD lesion","Significant left main stem disease or complex three-vessel disease, especially with diabetes","An isolated RCA lesion","Single-vessel disease in a young patient","No coronary disease"],a:1,
+e:"Left main and complex multivessel disease (high SYNTAX score), particularly in diabetics, achieve better outcomes with CABG. Simpler single-vessel disease is usually treated with PCI."},
+
+/* ==================== MODULE 2: DIAGNOSTICS (ECG) ==================== */
+{m:"Module 2",t:"Sgarbossa in LBBB",s:"A patient with chest pain has a known/old LBBB. Which finding suggests acute MI despite the LBBB?",
+o:["Any LBBB is diagnostic of MI","Concordant ST elevation (\u22651 mm in leads with a positive QRS) or excessive discordant ST elevation","A wide QRS alone","Left axis deviation","A notched R wave"],a:1,
+e:"Sgarbossa criteria help diagnose MI in LBBB: concordant ST elevation, concordant ST depression in V1-V3, or excessively discordant ST elevation. LBBB alone is not diagnostic."},
+
+{m:"Module 2",t:"Mobitz type II",s:"An ECG shows intermittent non-conducted P waves with a CONSTANT PR interval in conducted beats. This is:",
+o:["First-degree block","Mobitz I (Wenckebach)","Mobitz II second-degree block, which often requires pacing","Complete heart block","Sinus arrhythmia"],a:2,
+e:"Mobitz II (constant PR with sudden dropped beats) reflects infranodal disease and risks progression to complete block, often needing a pacemaker. Wenckebach shows progressive PR lengthening before a dropped beat."},
+
+{m:"Module 2",t:"WPW and AF",s:"A patient with Wolff-Parkinson-White (delta wave) develops pre-excited atrial fibrillation. Which drug class is dangerous and should be avoided?",
+o:["Procainamide","AV nodal blocking agents (e.g. adenosine, verapamil, digoxin)","Flecainide","DC cardioversion","Beta-blockers only in stable patients"],a:1,
+e:"In pre-excited AF, AV nodal blockers can accelerate conduction down the accessory pathway, risking VF. Use agents that act on the pathway (e.g. procainamide) or cardiovert if unstable."},
+
+{m:"Module 2",t:"Long QT and torsades",s:"A patient on multiple QT-prolonging drugs develops polymorphic VT (torsades de pointes). Acute management includes:",
+o:["More QT-prolonging antiarrhythmics","IV magnesium sulfate and removing offending drugs/correcting electrolytes","Digoxin","Verapamil","Beta-agonists"],a:1,
+e:"Torsades is treated with IV magnesium, correcting hypokalaemia/hypomagnesaemia, stopping offending drugs, and overdrive pacing/isoprenaline if bradycardia-dependent. Defibrillate if pulseless."},
+
+{m:"Module 2",t:"P pulmonale",s:"Tall, peaked P waves (>2.5 mm) in the inferior leads (P pulmonale) indicate:",
+o:["Left atrial enlargement","Right atrial enlargement, often from chronic lung disease/pulmonary hypertension","Ventricular hypertrophy","A normal variant only","Hyperkalaemia"],a:1,
+e:"P pulmonale (tall peaked P waves) reflects right atrial enlargement, classically in chronic lung disease or pulmonary hypertension. P mitrale (broad bifid P) reflects left atrial enlargement."},
+
+/* ==================== MODULE 3: MEDICINE (GASTRO) ==================== */
+{m:"Module 3",t:"Coeliac with IgA deficiency",s:"A patient being tested for coeliac disease has a low total IgA. The appropriate serological approach is:",
+o:["Report the anti-tTG IgA as negative","Use IgG-based testing (e.g. deamidated gliadin peptide or tTG IgG)","Stop investigating","Start a gluten-free diet empirically","Repeat IgA testing only"],a:1,
+e:"Selective IgA deficiency causes false-negative anti-tTG IgA. In IgA-deficient patients use IgG-based serology, and biopsy remains confirmatory while still eating gluten."},
+
+{m:"Module 3",t:"Coeliac biopsy findings",s:"The characteristic duodenal biopsy findings in coeliac disease are:",
+o:["Transmural granulomas","Villous atrophy, crypt hyperplasia and intraepithelial lymphocytosis","Goblet cell metaplasia only","Normal villi","Caseating granulomas"],a:1,
+e:"Coeliac shows villous atrophy, crypt hyperplasia and raised intraepithelial lymphocytes (Marsh classification). Granulomas suggest Crohn's; biopsy must be on a gluten-containing diet."},
+
+{m:"Module 3",t:"Dermatitis herpetiformis",s:"A coeliac patient develops intensely itchy vesicles on the extensor surfaces. This skin condition is:",
+o:["Psoriasis","Dermatitis herpetiformis (responds to a gluten-free diet, and to dapsone)","Eczema","Pemphigus","Contact dermatitis"],a:1,
+e:"Dermatitis herpetiformis is the cutaneous manifestation of coeliac disease, with IgA deposition; it improves on a gluten-free diet and symptomatically with dapsone."},
+
+{m:"Module 3",t:"UC and PSC",s:"A patient with ulcerative colitis develops a cholestatic LFT pattern and a 'beaded' biliary tree on MRCP. This association is:",
+o:["Primary biliary cholangitis","Primary sclerosing cholangitis, which also raises colorectal and cholangiocarcinoma risk","Autoimmune hepatitis","Gallstones only","Gilbert's syndrome"],a:1,
+e:"PSC is strongly associated with UC and causes multifocal biliary strictures (beading). It increases the risk of cholangiocarcinoma and colorectal cancer, affecting surveillance."},
+
+{m:"Module 3",t:"IBD flare and C. difficile",s:"A known UC patient presents with a severe bloody-diarrhoea flare. Before escalating immunosuppression, an essential step is:",
+o:["Start high-dose steroids immediately without tests","Exclude superimposed infection (stool for C. difficile and enteric pathogens; consider CMV)","Begin biologics empirically","Operate immediately","Give antidiarrhoeals"],a:1,
+e:"Infection (especially C. difficile, and CMV in those on immunosuppression) can mimic or complicate an IBD flare. Exclude it before intensifying immunosuppression, alongside assessing severity."},
+
+{m:"Module 3",t:"Barrett's with dysplasia",s:"Surveillance endoscopy in a patient with Barrett's oesophagus shows high-grade dysplasia. Appropriate management is:",
+o:["Reassure and rescope in 5 years","Endoscopic therapy (resection and/or ablation) given the cancer risk","A PPI alone","No further action","Immediate oesophagectomy for all"],a:1,
+e:"High-grade dysplasia in Barrett's carries a substantial progression risk and is managed with endoscopic eradication (resection of visible lesions plus radiofrequency ablation), not simple surveillance."},
+
+{m:"Module 3",t:"H. pylori test timing",s:"A patient on long-term omeprazole needs accurate H. pylori testing by urea breath test. You should:",
+o:["Test on the PPI","Stop the PPI for about 2 weeks before testing to avoid a false negative","Double the PPI first","Use serology instead (best test)","Test immediately after a meal"],a:1,
+e:"PPIs suppress H. pylori activity and cause false-negative breath/stool antigen tests; stop the PPI for about 2 weeks (and antibiotics for 4) before testing. Serology cannot confirm eradication."},
+
+{m:"Module 3",t:"Oropharyngeal vs oesophageal dysphagia",s:"A patient coughs and nasally regurgitates immediately on swallowing, with a wet voice. This pattern localises to:",
+o:["Oesophageal mechanical obstruction","Oropharyngeal (transfer) dysphagia, often neurological","Achalasia","A lower oesophageal web","GORD"],a:1,
+e:"Immediate coughing, nasal regurgitation and aspiration on initiating a swallow indicate oropharyngeal dysphagia (often stroke or neuromuscular). Food sticking seconds later suggests oesophageal causes."},
+
+{m:"Module 3",t:"Microcytic discrimination",s:"A microcytic anaemia with a normal/raised RBC count, normal ferritin and a low Mentzer index (MCV/RBC <13). The most likely diagnosis is:",
+o:["Iron deficiency","Thalassaemia trait","Anaemia of chronic disease","B12 deficiency","Acute blood loss"],a:1,
+e:"Thalassaemia trait gives microcytosis with a preserved RBC count, normal iron stores and a low Mentzer index. Iron deficiency lowers the RBC count, raises the index, and lowers ferritin."},
+
+{m:"Module 3",t:"B12 vs folate discrimination",s:"To distinguish B12 from folate deficiency when both can cause macrocytosis, a useful metabolite is:",
+o:["Raised methylmalonic acid, which is elevated in B12 deficiency but not folate deficiency","Ferritin","Reticulocyte count","Bilirubin","D-dimer"],a:0,
+e:"Methylmalonic acid rises in B12 deficiency (and homocysteine rises in both). This helps when serum B12 is borderline, and matters because B12 deficiency causes neurological damage."},
+
+{m:"Module 3",t:"Pernicious anaemia",s:"A patient with macrocytic anaemia, low B12 and positive intrinsic factor antibodies has:",
+o:["Folate deficiency","Pernicious anaemia (autoimmune, treated with B12 injections)","Thalassaemia","Iron deficiency","Sideroblastic anaemia"],a:1,
+e:"Pernicious anaemia is autoimmune loss of intrinsic factor (anti-IF and anti-parietal cell antibodies), causing B12 malabsorption; treat with parenteral B12. It also raises gastric cancer risk."},
+
+{m:"Module 3",t:"Subacute combined degeneration",s:"A patient with B12 deficiency has paraesthesiae, loss of proprioception and an extensor plantar response, with only mild anaemia. The priority is:",
+o:["Withhold B12 until anaemia worsens","Treat B12 deficiency promptly to prevent irreversible neurological damage","Give folate alone","Iron supplementation","Reassurance"],a:1,
+e:"Neurological B12 deficiency (subacute combined degeneration) can occur with minimal anaemia and may be irreversible if untreated. Treat promptly; never give folate alone when B12 deficiency is possible."},
+
+/* ==================== MODULE 3: GENERAL PRACTICE (GI) ==================== */
+{m:"Module 3",t:"EHEC and antibiotics",s:"A child with bloody diarrhoea has Shiga toxin-producing E. coli (O157). Regarding antibiotics:",
+o:["Give antibiotics to shorten illness","Avoid antibiotics, as they may increase the risk of haemolytic uraemic syndrome","Antibiotics are always mandatory","Give antimotility agents","Use antivirals"],a:1,
+e:"In Shiga toxin-producing E. coli, antibiotics (and antimotility agents) may increase toxin release and HUS risk. Management is supportive with monitoring for HUS (anaemia, thrombocytopenia, AKI)."},
+
+{m:"Module 3",t:"Chronic giardiasis",s:"A returned traveller has weeks of bloating, foul diarrhoea and weight loss with fat malabsorption. The likely organism and treatment is:",
+o:["Campylobacter; azithromycin","Giardia lamblia; metronidazole (or tinidazole)","Rotavirus; supportive only","Salmonella; ciprofloxacin","Norovirus; supportive only"],a:1,
+e:"Giardia causes chronic diarrhoea with malabsorption after contaminated water exposure; treat with metronidazole or tinidazole. Stool antigen/PCR aids diagnosis."},
+
+{m:"Module 3",t:"Bowel screening with family history",s:"A 40-year-old whose father had colorectal cancer at 45. Compared with the average-risk iFOBT program, this patient should be offered:",
+o:["The standard iFOBT from age 50","Earlier and more intensive screening, typically colonoscopy, with specialist/genetics input as indicated","No screening until symptomatic","A single colonoscopy at 75","Only annual blood tests"],a:1,
+e:"A significant family history raises risk and warrants earlier, colonoscopy-based surveillance (timing guided by the relative's age and number affected), sometimes with genetics referral, rather than the population iFOBT pathway."},
+
+{m:"Module 3",t:"Migrant health screening",s:"A newly arrived refugee with eosinophilia. Which parasitic infection, which can persist for decades and disseminate if immunosuppressed, should be screened for?",
+o:["Giardia","Strongyloides stercoralis","Pinworm","Rotavirus","Norovirus"],a:1,
+e:"Strongyloides can persist for decades and cause life-threatening hyperinfection with immunosuppression (e.g. steroids); screen at-risk migrants (serology) and treat with ivermectin. Also consider schistosomiasis, hepatitis B and TB."},
+
+{m:"Module 3",t:"NSAID ulcer prevention",s:"A patient who needs ongoing NSAIDs has a history of peptic ulcer. The most appropriate co-therapy is:",
+o:["No prophylaxis","A proton pump inhibitor for gastroprotection (and consider H. pylori testing/eradication)","An antacid as needed only","Doubling the NSAID","A second NSAID"],a:1,
+e:"High GI-risk patients on NSAIDs need a PPI for gastroprotection; test and eradicate H. pylori if present, and use the lowest effective NSAID dose or an alternative."},
+
+/* ==================== MODULE 3: SURGERY (COLORECTAL + SOFT TISSUE) ==================== */
+{m:"Module 3",t:"Appendicitis imaging choice",s:"A 24-year-old woman with suspected appendicitis and a possible gynaecological cause. The most appropriate first imaging to limit radiation is:",
+o:["CT abdomen first-line","Ultrasound (with CT if inconclusive)","MRI first-line","Plain abdominal X-ray","No imaging, operate on all"],a:1,
+e:"In young women and pregnancy, ultrasound is preferred first to avoid radiation and assess gynaecological causes; CT is used if ultrasound is inconclusive in non-pregnant patients."},
+
+{m:"Module 3",t:"Appendix mass",s:"A patient presents late with a right iliac fossa mass and walled-off appendicitis (phlegmon), systemically stable. The usual management is:",
+o:["Immediate appendicectomy","Conservative treatment with antibiotics and consideration of interval appendicectomy/colonoscopy","Right hemicolectomy now","No treatment","Long-term steroids"],a:1,
+e:"An appendix mass/phlegmon is often managed conservatively with antibiotics; immediate surgery is difficult and morbid. Interval appendicectomy and colonoscopy (to exclude malignancy in older patients) are considered."},
+
+{m:"Module 3",t:"Caecal vs sigmoid volvulus",s:"Compared with sigmoid volvulus (often decompressed endoscopically), a caecal volvulus typically requires:",
+o:["Endoscopic decompression as definitive treatment","Surgical management (e.g. right hemicolectomy or caecopexy)","No treatment","Long-term laxatives only","Observation"],a:1,
+e:"Sigmoid volvulus often responds to endoscopic decompression; caecal volvulus usually needs surgery (resection or fixation) as endoscopic reduction is less reliable and recurrence is high."},
+
+{m:"Module 3",t:"Ogilvie syndrome",s:"A post-operative patient develops massive colonic dilatation with no mechanical obstruction on imaging (acute colonic pseudo-obstruction). After conservative measures and correcting electrolytes, a pharmacological option is:",
+o:["Loperamide","Neostigmine (with cardiac monitoring)","Codeine","A bulking agent","Octreotide"],a:1,
+e:"Ogilvie syndrome (pseudo-obstruction) is managed by treating precipitants, decompression and correcting electrolytes; neostigmine can restore motility (monitor for bradycardia). Colonoscopic decompression if refractory."},
+
+{m:"Module 3",t:"Rectal cancer staging",s:"A newly diagnosed rectal cancer. Which investigation best defines local tumour stage to guide neoadjuvant therapy?",
+o:["Colonoscopy alone","Pelvic MRI","Chest X-ray","Abdominal ultrasound","Barium enema"],a:1,
+e:"Pelvic MRI assesses local T and N stage and the circumferential resection margin in rectal cancer, guiding neoadjuvant chemoradiotherapy. CT chest/abdomen/pelvis assesses distant disease; CEA is a baseline marker."},
+
+{m:"Module 3",t:"Anal fissure management",s:"A patient with a painful posterior midline anal fissure. First-line management after fibre and stool softeners is:",
+o:["Immediate lateral sphincterotomy","Topical GTN or diltiazem to relax the internal sphincter and improve healing","Long-term opioids","Steroid suppositories only","Banding"],a:1,
+e:"Chronic anal fissures heal with stool softeners/fibre plus topical GTN or calcium channel blocker (or botulinum toxin) to reduce sphincter spasm; lateral sphincterotomy is reserved for refractory cases."},
+
+{m:"Module 3",t:"Perianal abscess",s:"A patient with a fluctuant, tender perianal swelling and fever. The definitive treatment is:",
+o:["Oral antibiotics alone","Incision and drainage","Topical steroids","Sitz baths only","Observation"],a:1,
+e:"A perianal abscess requires incision and drainage; antibiotics alone are insufficient. A proportion will develop a fistula-in-ano requiring later management."},
+
+{m:"Module 3",t:"Anal cancer",s:"A patient with an anal canal squamous cell carcinoma (HPV-related). The standard first-line treatment is:",
+o:["Abdominoperineal resection first-line","Chemoradiotherapy (the Nigro protocol), with surgery reserved for residual/recurrent disease","Topical chemotherapy","Observation","Radiotherapy alone"],a:1,
+e:"Anal SCC is treated primarily with combined chemoradiotherapy (5-FU/mitomycin plus radiation), preserving the sphincter; salvage surgery (APR) is reserved for persistent or recurrent disease."},
+
+{m:"Module 3",t:"Melanoma margins",s:"After excisional biopsy confirms a 1.5 mm thick melanoma, the next steps include:",
+o:["No further surgery","Wide local excision with margins guided by Breslow thickness, and consideration of sentinel lymph node biopsy","Topical therapy","Cryotherapy","Radiotherapy alone"],a:1,
+e:"Definitive management is wide local excision with margins set by Breslow thickness, plus sentinel node biopsy for intermediate-thickness lesions to stage the nodal basin."},
+
+{m:"Module 3",t:"High-risk SCC",s:"Which cutaneous squamous cell carcinoma feature most increases the risk of metastasis?",
+o:["Location on the trunk","Thick, poorly differentiated lesions on the lip or ear, with perineural invasion","A lesion under 1 cm","Slow growth","Pigmentation"],a:1,
+e:"High-risk SCC features include lip/ear location, large size and depth, poor differentiation, perineural invasion and immunosuppression. These guide margins and the need for adjuvant treatment."},
+
+/* ==================== MODULE 3: DIAGNOSTICS (FBC / IRON / B12 / COAG) ==================== */
+{m:"Module 3",t:"Anaemia of chronic disease vs IDA",s:"Two patients have microcytic anaemia. Patient A: low ferritin, high TIBC, low transferrin saturation. Patient B: high ferritin, low TIBC, low transferrin saturation. The diagnoses are:",
+o:["Both iron deficiency","A = iron deficiency; B = anaemia of chronic disease","A = thalassaemia; B = iron deficiency","Both anaemia of chronic disease","A = ACD; B = iron deficiency"],a:1,
+e:"Iron deficiency: low ferritin, high TIBC, low saturation. Anaemia of chronic disease: ferritin normal/high (acute-phase) with low TIBC and low saturation due to iron sequestration."},
+
+{m:"Module 3",t:"Thalassaemia confirmation",s:"A patient with microcytosis and normal iron studies. The confirmatory test for beta-thalassaemia trait is:",
+o:["Repeat ferritin","Haemoglobin electrophoresis (HPLC) showing raised HbA2","Bone marrow biopsy first-line","D-dimer","Coagulation screen"],a:1,
+e:"Beta-thalassaemia trait is confirmed by haemoglobin electrophoresis/HPLC showing raised HbA2 (and sometimes HbF). Iron studies are normal, distinguishing it from iron deficiency."},
+
+{m:"Module 3",t:"Myelodysplasia",s:"An older patient has pancytopenia with dysplastic cells and a small percentage of blasts on marrow examination, and is transfusion-dependent. The diagnosis and key risk is:",
+o:["Iron deficiency; no risk","Myelodysplastic syndrome, with risk of transformation to acute myeloid leukaemia","Reactive change; benign","Thalassaemia","Vitamin deficiency only"],a:1,
+e:"Myelodysplastic syndromes cause cytopenias with dysplasia and a risk of progression to AML. Risk stratification (e.g. IPSS) guides supportive care versus disease-modifying therapy."},
+
+{m:"Module 3",t:"Coag cascade localisation",s:"A patient has an isolated prolonged APTT that fully corrects on mixing with normal plasma. This suggests:",
+o:["A factor inhibitor","A factor deficiency in the intrinsic pathway (e.g. haemophilia)","Warfarin effect","A platelet disorder","Vitamin K excess"],a:1,
+e:"Correction on mixing indicates a factor deficiency (the normal plasma supplies the missing factor); a prolonged APTT points to the intrinsic pathway (e.g. factor VIII/IX). Failure to correct suggests an inhibitor (e.g. lupus anticoagulant or factor inhibitor)."},
+
+{m:"Module 3",t:"Haemophilia pattern",s:"A young boy with recurrent haemarthroses has a prolonged APTT, normal PT and normal platelets, with low factor VIII activity. Diagnosis:",
+o:["Von Willebrand disease","Haemophilia A","Vitamin K deficiency","DIC","ITP"],a:1,
+e:"Haemophilia A (X-linked factor VIII deficiency) causes deep bleeding (haemarthroses) with isolated APTT prolongation. Von Willebrand disease causes more mucocutaneous bleeding and affects vWF and factor VIII."},
+
+{m:"Module 3",t:"Von Willebrand disease",s:"The most common inherited bleeding disorder, presenting with mucocutaneous bleeding (epistaxis, menorrhagia, bruising), is:",
+o:["Haemophilia B","Von Willebrand disease","DIC","ITP","Factor V Leiden"],a:1,
+e:"Von Willebrand disease is the commonest inherited bleeding disorder, causing platelet-type (mucocutaneous) bleeding. vWF stabilises factor VIII and supports platelet adhesion; desmopressin helps some subtypes."},
+
+{m:"Module 3",t:"DIC laboratory profile",s:"Which combination of results best fits disseminated intravascular coagulation?",
+o:["Normal platelets, normal fibrinogen, normal D-dimer","Low platelets, low fibrinogen, raised D-dimer, prolonged PT and APTT","High platelets and high fibrinogen","Isolated APTT prolongation only","Isolated thrombocytosis"],a:1,
+e:"DIC consumes platelets and clotting factors: thrombocytopenia, low fibrinogen, prolonged PT/APTT and raised D-dimer. Management targets the underlying trigger with supportive blood products."},
+
+{m:"Module 3",t:"Vitamin K deficiency pattern",s:"In early vitamin K deficiency, which clotting test prolongs first, and why?",
+o:["APTT, due to factor VIII loss","PT/INR, because factor VII (vitamin K dependent) has the shortest half-life","Bleeding time","Thrombin time","Platelet count falls first"],a:1,
+e:"Factor VII has the shortest half-life of the vitamin K-dependent factors, so the PT/INR (extrinsic pathway) prolongs first in deficiency or early warfarin effect."},
+
+{m:"Module 3",t:"Antiphospholipid paradox",s:"A patient with recurrent thromboses has a prolonged APTT that does NOT correct on mixing, with positive lupus anticoagulant. The clinical risk is:",
+o:["Bleeding only","Thrombosis (despite the prolonged APTT in vitro)","No clinical effect","Only fetal effects","Platelet excess"],a:1,
+e:"The lupus anticoagulant prolongs the APTT in vitro but causes a prothrombotic state in vivo (arterial/venous thrombosis, pregnancy loss). Failure to correct on mixing indicates an inhibitor. Management is anticoagulation."},
+
+/* ==================== MODULE 4: MEDICINE (HEPATOBILIARY) ==================== */
+{m:"Module 4",t:"SBP treatment and prophylaxis",s:"A cirrhotic with ascites has an ascitic neutrophil count of 400/mm\u00b3. Beyond IV cefotaxime/ceftriaxone, which intervention reduces hepatorenal syndrome and mortality?",
+o:["Oral vancomycin","IV albumin","Loop diuretics","Beta-blockers","Lactulose"],a:1,
+e:"In SBP (PMN \u2265250), IV albumin (given with antibiotics) reduces renal impairment and mortality. Survivors need secondary antibiotic prophylaxis (e.g. norfloxacin)."},
+
+{m:"Module 4",t:"Hepatorenal syndrome",s:"A cirrhotic with tense ascites develops a rising creatinine that does not improve with volume expansion, with a bland urinalysis and no shock. The likely diagnosis and treatment is:",
+o:["Acute tubular necrosis; dialysis only","Hepatorenal syndrome; terlipressin (a vasoconstrictor) plus albumin","Pre-renal from dehydration; more diuretics","Glomerulonephritis; steroids","Obstruction; catheter"],a:1,
+e:"Hepatorenal syndrome is functional renal failure from splanchnic vasodilation in advanced cirrhosis, diagnosed after excluding other causes and a fluid challenge. Treat with a vasoconstrictor (terlipressin) plus albumin; definitive treatment is liver transplant."},
+
+{m:"Module 4",t:"Variceal primary prophylaxis",s:"A cirrhotic found to have medium oesophageal varices on screening endoscopy, never bled. Appropriate primary prophylaxis is:",
+o:["Nothing until they bleed","A non-selective beta-blocker (e.g. propranolol/carvedilol) OR endoscopic band ligation","A PPI alone","Warfarin","A NOAC"],a:1,
+e:"Primary prophylaxis against first variceal bleed uses a non-selective beta-blocker (lowers portal pressure) or endoscopic band ligation. The choice depends on varix size and patient factors."},
+
+{m:"Module 4",t:"Hepatic encephalopathy precipitant",s:"A previously stable cirrhotic becomes encephalopathic. Besides lactulose, the most important action is:",
+o:["Restrict all protein permanently","Identify and treat a precipitant (e.g. GI bleed, infection/SBP, constipation, electrolyte disturbance, sedatives)","Give a high-protein diet","Start a sedative","Fluid restrict only"],a:1,
+e:"Encephalopathy is usually precipitated; search for and treat GI bleeding, infection, constipation, electrolyte derangement and sedating drugs alongside lactulose (and rifaximin for recurrence). Severe protein restriction is avoided."},
+
+{m:"Module 4",t:"SAAG interpretation",s:"Ascitic fluid analysis shows a serum-ascites albumin gradient (SAAG) of 8 g/L. This indicates the ascites is most likely due to:",
+o:["Portal hypertension/cirrhosis","A peritoneal cause such as malignancy or tuberculosis","Cardiac failure","Constrictive pericarditis","Budd-Chiari"],a:1,
+e:"A low SAAG (<11 g/L) indicates a non-portal, peritoneal cause (malignancy, TB, pancreatic). A high SAAG (\u226511 g/L) indicates portal hypertension (cirrhosis, cardiac, Budd-Chiari)."},
+
+{m:"Module 4",t:"Alcohol withdrawal regimen",s:"An inpatient in alcohol withdrawal is managed with symptom-triggered diazepam. Which co-treatment must be given to prevent a specific complication?",
+o:["IV glucose first","Parenteral thiamine (before glucose) to prevent Wernicke encephalopathy","An antipsychotic routinely","A beta-blocker","Spironolactone"],a:1,
+e:"Symptom-triggered benzodiazepines (e.g. CIWA-guided diazepam) control withdrawal; parenteral thiamine must be given (and before any glucose) to prevent Wernicke encephalopathy."},
+
+{m:"Module 4",t:"Wernicke triad",s:"A malnourished patient with alcohol use disorder presents with confusion, gaze palsy and ataxia. Failure to treat promptly risks progression to:",
+o:["Hepatic encephalopathy","Korsakoff syndrome (irreversible amnesia and confabulation)","Delirium tremens only","Cerebellar stroke","Normal recovery"],a:1,
+e:"Untreated Wernicke encephalopathy (confusion, ophthalmoplegia, ataxia) can progress to irreversible Korsakoff amnestic syndrome. Give high-dose parenteral thiamine urgently."},
+
+{m:"Module 4",t:"Stages of change matching",s:"A patient with alcohol use disorder is in the 'contemplation' stage. The most appropriate clinician response is:",
+o:["Provide detailed relapse-prevention strategies (an action-stage tool)","Use motivational interviewing to explore ambivalence and build readiness","Discharge with no advice","Insist on immediate abstinence","Prescribe disulfiram immediately"],a:1,
+e:"Interventions should match the stage. In contemplation, motivational interviewing to explore ambivalence and tip the balance toward change is most effective; action-stage tools come once the patient is ready to act."},
+
+{m:"Module 4",t:"Hepatitis B serology window",s:"A patient is HBsAg negative, anti-HBc IgM positive, anti-HBs negative. This best fits:",
+o:["Vaccinated and immune","The window period of acute hepatitis B","Chronic hepatitis B","Never infected","Hepatitis C"],a:1,
+e:"During the window period, HBsAg has cleared but anti-HBs has not yet appeared; IgM anti-HBc indicates recent acute infection. Anti-HBs alone indicates vaccination; HBsAg >6 months indicates chronic infection."},
+
+{m:"Module 4",t:"Chronic hepatitis B treatment",s:"Which first-line antivirals are used for chronic hepatitis B requiring treatment, with a high barrier to resistance?",
+o:["Interferon lifelong only","Entecavir or tenofovir","Ribavirin alone","Direct-acting antivirals used for hepatitis C","No effective therapy"],a:1,
+e:"Entecavir and tenofovir are first-line oral nucleos(t)ide analogues for chronic hepatitis B (high potency, high resistance barrier). Treatment decisions consider e-antigen status, viral load, ALT and fibrosis. The DAAs are for hepatitis C."},
+
+{m:"Module 4",t:"Severe falciparum malaria",s:"A returned traveller with P. falciparum has impaired consciousness and a high parasitaemia. The correct treatment is:",
+o:["Oral artemisinin combination therapy","Intravenous artesunate","Chloroquine","Doxycycline alone","Primaquine"],a:1,
+e:"Severe/complicated falciparum malaria (cerebral involvement, high parasitaemia, organ dysfunction) is treated with IV artesunate. Uncomplicated falciparum uses oral ACT."},
+
+{m:"Module 4",t:"Vivax relapse prevention",s:"A patient treated for P. vivax malaria needs an additional drug to prevent relapse from liver hypnozoites. Before prescribing it you must check:",
+o:["Renal function only","G6PD status, because primaquine causes haemolysis in G6PD deficiency","Liver biopsy","Blood group","Thyroid function"],a:1,
+e:"P. vivax and ovale form dormant liver hypnozoites; primaquine eradicates them but causes severe haemolysis in G6PD deficiency, so test G6PD before prescribing."},
+
+{m:"Module 4",t:"PBC vs PSC vs AIH",s:"A middle-aged woman with pruritus, a cholestatic LFT pattern and a positive anti-mitochondrial antibody most likely has:",
+o:["Primary sclerosing cholangitis","Primary biliary cholangitis (treated with ursodeoxycholic acid)","Autoimmune hepatitis","Haemochromatosis","Wilson disease"],a:1,
+e:"PBC: AMA-positive cholestatic disease in middle-aged women, treated with ursodeoxycholic acid. PSC is pANCA-associated with IBD and biliary beading; autoimmune hepatitis is a hepatocellular pattern with ASMA/anti-LKM treated with steroids."},
+
+{m:"Module 4",t:"HCC surveillance",s:"For a patient with established cirrhosis, recommended hepatocellular carcinoma surveillance is:",
+o:["Annual CXR","6-monthly liver ultrasound (with or without AFP)","No surveillance needed","CT every month","Liver biopsy yearly"],a:1,
+e:"Cirrhosis warrants 6-monthly ultrasound surveillance (sometimes with AFP) for HCC, as early detection allows curative options. Diagnostic confirmation uses contrast CT/MRI with characteristic features."},
+
+{m:"Module 4",t:"Acute liver failure",s:"A patient with no prior liver disease develops jaundice, a markedly raised INR and new confusion over days (e.g. after paracetamol overdose). This defines:",
+o:["Compensated cirrhosis","Acute liver failure (coagulopathy plus encephalopathy), needing urgent transfer to a transplant centre","Gilbert's syndrome","Simple hepatitis","Cholestasis"],a:1,
+e:"Acute liver failure is rapid hepatocellular dysfunction with coagulopathy (raised INR) and encephalopathy in someone without chronic liver disease. It needs urgent specialist/transplant-centre management; treat paracetamol toxicity with N-acetylcysteine."},
+
+{m:"Module 4",t:"Paracentesis with large volume",s:"During large-volume paracentesis (e.g. >5 L) for tense ascites, what reduces post-paracentesis circulatory dysfunction?",
+o:["Rapid IV crystalloid only","Intravenous albumin replacement","Withholding all fluids","A vasopressor infusion routinely","Diuretics during the tap"],a:1,
+e:"Large-volume paracentesis can cause circulatory dysfunction; IV albumin (commonly about 6-8 g per litre removed beyond a threshold) reduces this and renal impairment."},
+
+/* ==================== MODULE 4: GENERAL PRACTICE (DERMATOLOGY) ==================== */
+{m:"Module 4",t:"Topical steroid potency by site",s:"For a thick, lichenified plaque of chronic eczema on the palm, compared with a flare on the face, the appropriate steroid potency is:",
+o:["Low potency everywhere","A potent topical steroid on the palm; low potency on the face","Potent steroid on both","No steroid on the palm","Oral steroids first-line"],a:1,
+e:"Thick skin (palms/soles) and lichenified plaques need a potent steroid; thin skin (face, flexures, genitals) needs low potency for short periods to avoid atrophy. Match potency to site and severity."},
+
+{m:"Module 4",t:"Topical steroid side effects",s:"Prolonged potent topical steroid use on the face most characteristically causes:",
+o:["Hyperpigmentation only","Skin atrophy, telangiectasia, striae and perioral dermatitis","Improved skin thickness","Hair growth only","No side effects"],a:1,
+e:"Local side effects of potent topical steroids include atrophy, telangiectasia, striae, perioral dermatitis and tachyphylaxis; on the face these occur readily, hence low-potency short courses."},
+
+{m:"Module 4",t:"Eczema herpeticum",s:"A child with atopic eczema develops a rapidly spreading, painful vesicular eruption with punched-out erosions and fever. The correct action is:",
+o:["Increase the topical steroid","Recognise eczema herpeticum and treat urgently with systemic aciclovir","Topical antifungal","Reassure, it is a normal flare","Oral antihistamine only"],a:1,
+e:"Eczema herpeticum is disseminated HSV infection of eczematous skin (monomorphic punched-out vesicles/erosions, systemic illness). It is an emergency needing prompt systemic aciclovir and ophthalmology review if periocular."},
+
+{m:"Module 4",t:"Psoriasis triggers",s:"Which of the following can trigger or worsen psoriasis, including precipitating a pustular flare on withdrawal?",
+o:["Topical emollients","Systemic corticosteroids (withdrawal), beta-blockers and lithium","Vitamin D analogues","Sunlight in most patients","Coal tar"],a:1,
+e:"Recognised psoriasis triggers include beta-blockers, lithium, antimalarials, infection and abrupt systemic steroid withdrawal (which can precipitate pustular psoriasis). Sunlight usually helps."},
+
+{m:"Module 4",t:"Isotretinoin caution",s:"Before prescribing oral isotretinoin for severe acne in a woman of childbearing potential, the essential requirement is:",
+o:["No precautions","Strict pregnancy prevention (it is highly teratogenic), plus monitoring of lipids and liver function","An antibiotic first","Topical steroids","Avoiding sun only"],a:1,
+e:"Isotretinoin is highly teratogenic; reliable contraception and pregnancy prevention are mandatory, with monitoring of lipids, LFTs and mood. It is reserved for severe or refractory acne."},
+
+{m:"Module 4",t:"Rosacea vs acne",s:"A middle-aged adult has facial flushing, telangiectasia and papulopustules but NO comedones, worsened by alcohol and heat. The diagnosis and a key management point is:",
+o:["Acne; use topical steroids","Rosacea; topical metronidazole or ivermectin and trigger avoidance, and avoid topical steroids","Eczema; emollients","Psoriasis; vitamin D analogue","Contact dermatitis; patch testing"],a:1,
+e:"Rosacea lacks comedones (unlike acne), features flushing and telangiectasia, and is treated with topical metronidazole/ivermectin (or oral doxycycline) plus trigger avoidance. Topical steroids worsen it."},
+
+{m:"Module 4",t:"Actinic keratosis",s:"A patient with multiple scaly actinic keratoses over sun-damaged skin. Appropriate field management includes:",
+o:["No treatment, they never progress","Cryotherapy for discrete lesions and field therapy (e.g. topical 5-fluorouracil or imiquimod), plus sun protection","Excision of all skin","Oral antibiotics","Potent steroids"],a:1,
+e:"Actinic keratoses are premalignant; treat discrete lesions (cryotherapy) and field-treat with topical agents (5-FU, imiquimod) or photodynamic therapy, with sun protection and surveillance for SCC."},
+
+{m:"Module 4",t:"Skin cancer in darker skin tones",s:"Which point about melanoma in people with darker skin is important for equitable care?",
+o:["Melanoma never occurs in darker skin","Acral lentiginous melanoma (palms, soles, nail beds) is relatively more common and often diagnosed late","Sunscreen is unnecessary","All melanomas look the same regardless of skin tone","Only the face is affected"],a:1,
+e:"In darker skin, acral lentiginous melanoma (palms, soles, subungual) is proportionally more common and frequently diagnosed late; examine these sites and avoid assuming low risk, to reduce disparities."},
+
+/* ==================== MODULE 4: SURGERY (OESO-GASTRIC + HEPATOBILIARY) ==================== */
+{m:"Module 4",t:"Paraoesophageal hernia",s:"Compared with a sliding hiatal hernia, a large paraoesophageal (rolling) hernia is more concerning because:",
+o:["It always causes reflux","It risks gastric volvulus, incarceration and strangulation","It needs no follow-up","It is purely cosmetic","It improves spontaneously"],a:1,
+e:"Paraoesophageal hernias allow the stomach to herniate alongside the oesophagus, risking volvulus, obstruction and strangulation; symptomatic or complicated ones warrant surgical repair. Sliding hernias mainly cause reflux."},
+
+{m:"Module 4",t:"Oesophageal cancer subtype",s:"A patient with a mid-oesophageal tumour and a long smoking and alcohol history most likely has which histological type?",
+o:["Adenocarcinoma","Squamous cell carcinoma","Small cell carcinoma","Lymphoma","GIST"],a:1,
+e:"Squamous cell carcinoma typically affects the upper/mid oesophagus and is linked to smoking and alcohol. Adenocarcinoma affects the lower oesophagus and is linked to GORD/Barrett's and obesity."},
+
+{m:"Module 4",t:"Gastric cancer signs",s:"A patient with weight loss and a left supraclavicular node (Virchow's node) plus epigastric mass. This suggests:",
+o:["Benign ulcer","Advanced gastric cancer","Pancreatitis","Hiatal hernia","Gilbert's syndrome"],a:1,
+e:"Virchow's node (Troisier's sign), weight loss and an epigastric mass suggest advanced gastric cancer. Risk factors include H. pylori, smoking and diet; signet-ring/linitis plastica are aggressive forms."},
+
+{m:"Module 4",t:"Duodenal vs gastric ulcer",s:"A peptic ulcer where pain is RELIEVED by eating (and worse when hungry/at night) is most typical of:",
+o:["A gastric ulcer","A duodenal ulcer","Oesophageal cancer","Cholecystitis","Pancreatitis"],a:1,
+e:"Duodenal ulcer pain is classically relieved by food and recurs hours later or at night; gastric ulcer pain is often worsened by eating. Both relate to H. pylori and NSAIDs; biopsy gastric ulcers to exclude malignancy."},
+
+{m:"Module 4",t:"Gallstone disease spectrum",s:"A patient has episodic RUQ pain after fatty meals lasting a few hours, with no fever and normal LFTs and inflammatory markers. This is:",
+o:["Acute cholecystitis","Biliary colic","Ascending cholangitis","Gallstone pancreatitis","Choledocholithiasis with obstruction"],a:1,
+e:"Biliary colic is transient pain from a stone transiently obstructing the cystic duct, without inflammation (no fever, normal bloods). Cholecystitis adds persistent pain, fever and a positive Murphy's sign; cholangitis adds jaundice and fever."},
+
+{m:"Module 4",t:"Cholangitis management",s:"A patient with Charcot's triad (RUQ pain, fever, jaundice) and a dilated CBD with a stone. After resuscitation and IV antibiotics, the definitive step is:",
+o:["Elective cholecystectomy only","Urgent biliary drainage, usually by ERCP","Observation","Oral antibiotics and discharge","Right hemicolectomy"],a:1,
+e:"Ascending cholangitis needs antibiotics and urgent biliary decompression (ERCP with sphincterotomy/stone extraction). Reynolds' pentad (adding hypotension and confusion) signals severe disease. Cholecystectomy follows recovery."},
+
+{m:"Module 4",t:"Pancreatic adenocarcinoma",s:"An older patient with painless obstructive jaundice, weight loss and a palpable non-tender gallbladder. The tumour marker and key initial imaging are:",
+o:["AFP; ultrasound only","CA19-9; CT pancreas (pancreatic protocol)","CEA; colonoscopy","CA-125; MRI pelvis","PSA; bone scan"],a:1,
+e:"Painless obstructive jaundice with Courvoisier's sign suggests pancreatic head adenocarcinoma; CA19-9 is the associated marker and contrast CT (pancreatic protocol) stages it. Resectable disease may undergo a Whipple procedure."},
+
+{m:"Module 4",t:"Acute pancreatitis severity",s:"A patient with acute pancreatitis. Which feature most indicates severe disease and a need for higher-level care?",
+o:["Lipase 5x the upper limit of normal","Persistent organ dysfunction (e.g. hypoxia, AKI, hypotension) and a high Glasgow/APACHE score","Mild epigastric tenderness","A single episode of vomiting","Normal CRP at 48 hours"],a:1,
+e:"Severity is defined by organ failure and complications, not the absolute lipase. Scores (Glasgow/Imrie, APACHE II), CRP and CT severity index guide care; persistent organ dysfunction defines severe acute pancreatitis."},
+
+{m:"Module 4",t:"Splenic trauma and OPSI",s:"After splenectomy for trauma, the key long-term preventive measure is:",
+o:["Lifelong anticoagulation","Vaccination against encapsulated organisms and prophylaxis/education to prevent overwhelming post-splenectomy infection","Iron chelation","Annual colonoscopy","No follow-up"],a:1,
+e:"Asplenic patients risk overwhelming post-splenectomy infection from encapsulated bacteria; vaccinate (pneumococcal, meningococcal, Hib), consider antibiotic prophylaxis, and educate about fever and emergency antibiotics."},
+
+{m:"Module 4",t:"Femoral vs inguinal hernia",s:"Compared with inguinal hernias, femoral hernias are important because they:",
+o:["Never need surgery","Have a higher risk of strangulation and lie below and lateral to the pubic tubercle","Are always reducible","Occur only in men","Cause reflux"],a:1,
+e:"Femoral hernias (below and lateral to the pubic tubercle, more common in women) have a high strangulation risk due to the narrow neck, so repair is generally recommended even when asymptomatic."},
+
+/* ==================== MODULE 4: DIAGNOSTICS (LFT / ASCITIC / PLEURAL FLUID) ==================== */
+{m:"Module 4",t:"Hepatocellular vs cholestatic",s:"LFTs: ALT 800, AST 600, ALP 130 (mildly up), bilirubin raised. This pattern is:",
+o:["Cholestatic","Hepatocellular","Isolated hyperbilirubinaemia","Synthetic failure only","Normal"],a:1,
+e:"Disproportionate transaminase elevation (ALT/AST much greater than ALP) is a hepatocellular pattern (e.g. viral hepatitis, ischaemia, toxins). A cholestatic pattern shows ALP/GGT rising much more than transaminases."},
+
+{m:"Module 4",t:"ALP source",s:"A patient has an isolated raised ALP. To determine whether it is of hepatic rather than bony origin, the most useful next test is:",
+o:["Bilirubin","GGT (raised supports a hepatic source)","Albumin","INR","Amylase"],a:1,
+e:"A concurrently raised GGT supports a hepatobiliary source for the ALP; a normal GGT with raised ALP suggests bone (or pregnancy/growth). This guides the workup direction."},
+
+{m:"Module 4",t:"Conjugated vs unconjugated",s:"A jaundiced patient has dark urine and pale stools, with a predominantly CONJUGATED hyperbilirubinaemia. This indicates:",
+o:["Haemolysis","Cholestasis/obstruction (or hepatocellular conjugated handling problem)","Gilbert's syndrome","Normal physiology","Iron deficiency"],a:1,
+e:"Conjugated (water-soluble) bilirubin appears in urine (dark) and reduced bile reaches the gut (pale stools), indicating cholestasis/obstruction or hepatocellular disease. Unconjugated hyperbilirubinaemia (haemolysis, Gilbert's) does not cause dark urine."},
+
+{m:"Module 4",t:"Pleural fluid on diuretics",s:"A patient with heart failure on diuretics has a pleural effusion that borderline meets Light's exudate criteria. Which additional measurement helps avoid misclassifying a transudate as an exudate?",
+o:["Pleural pH","A serum-to-pleural-fluid albumin gradient (>12 g/L suggests transudate)","Pleural glucose","Pleural amylase","Pleural triglycerides"],a:1,
+e:"Diuretics can concentrate pleural protein/LDH and falsely label a cardiac transudate as exudate. A serum-effusion albumin gradient over 12 g/L supports a transudate despite Light's criteria."},
+
+{m:"Module 4",t:"Parapneumonic stages",s:"Which parapneumonic effusion finding most clearly mandates tube drainage rather than antibiotics alone?",
+o:["A small free-flowing effusion with pH 7.4","Frank pus, a positive Gram stain, or pleural pH <7.2","Mild breathlessness only","A clear transudate","A resolving effusion"],a:1,
+e:"Complicated parapneumonic effusions/empyema (pus, positive Gram stain/culture, loculation, or pH <7.2) require drainage. Simple free-flowing effusions can often be managed with antibiotics and observation."},
+
+{m:"Module 4",t:"Ascitic fluid workup",s:"Beyond SAAG, which ascitic fluid tests are most important to exclude infection and malignancy?",
+o:["Triglycerides only","Cell count with differential (neutrophils), culture, and cytology","Glucose only","pH only","Amylase only"],a:1,
+e:"Ascitic analysis includes cell count/differential (PMN \u2265250 indicates SBP), bacterial culture, and cytology for malignancy; amylase (pancreatic ascites) and other tests are added as indicated."},
+
+{m:"Module 4",t:"Synthetic function in acute illness",s:"Which abnormal LFT-related result best reflects impaired hepatic SYNTHETIC function in acute liver injury, carrying prognostic weight?",
+o:["A raised ALT","A prolonged INR (with low albumin in chronic disease)","A raised GGT","A raised ALP","A raised bilirubin alone"],a:1,
+e:"INR (prothrombin time) reflects synthesis of clotting factors and is a key acute prognostic marker (with bilirubin and encephalopathy). Albumin reflects synthetic function over a longer timeframe. Transaminases indicate injury, not function."}
+];
+
+let i=0,answered=[],chosen=[];
+const app=document.getElementById('app');
+function modList(){const s=[];Q.forEach(q=>{if(!s.includes(q.m))s.push(q.m);});return s;}
+function firstIndexOf(m){return Q.findIndex(q=>q.m===m);}
+function render(){
+  if(i>=Q.length)return summary();
+  const q=Q[i];const locked=answered[i]!==undefined;
+  app.innerHTML=header()+jump()+`
+    <div class="qcard">
+      <span class="tag">${q.m} \u00b7 ${q.t}</span>
+      <p class="stem">${i+1}. ${q.s}</p>
+      <div id="opts">
+        ${q.o.map((opt,idx)=>{let cls='opt';if(locked){if(idx===q.a)cls+=' right';else if(idx===chosen[i])cls+=' wrong';}return `<button class="${cls}" ${locked?'disabled':''} onclick="pick(${idx})"><b>${'ABCDE'[idx]}</b>${opt}</button>`;}).join('')}
+      </div>
+      ${locked?explain(q,i):''}
+      <div class="nav">
+        ${i>0?`<button class="btn ghost" onclick="prev()">Back</button>`:''}
+        ${locked?`<button class="btn" onclick="next()">${i===Q.length-1?'See results':'Next'}</button>`:`<span style="color:var(--muted);font-size:13px">Select an answer</span>`}
+        <span class="count">${i+1} / ${Q.length}</span>
+      </div>
+    </div>`;
+}
+function explain(q,idx){const correct=chosen[idx]===q.a;return `<div class="exp"><span class="verdict ${correct?'v-right':'v-wrong'}">${correct?'Correct.':'Not quite. Answer: '+'ABCDE'[q.a]+'.'}</span> ${q.e}</div>`;}
+function jump(){return `<div class="jump"><span>Jump to:</span>${modList().map(m=>`<button onclick="goto('${m.replace(/'/g,"\\'")}')">${m}</button>`).join('')}</div>`;}
+function goto(m){const idx=firstIndexOf(m);if(idx>=0){i=idx;render();window.scrollTo({top:0,behavior:'smooth'});}}
+function header(){
+  const done=answered.filter(x=>x!==undefined).length;
+  const correct=answered.filter((x,k)=>x!==undefined&&chosen[k]===Q[k].a).length;
+  const pct=done?Math.round(correct/done*100):0;
+  return `<h1>MEDI4001 Hard Bank</h1>
+    <p class="sub">Modules 1\u20134 \u00b7 ${Q.length} questions \u00b7 Level 5\u20136 reasoning \u00b7 Australian guidelines</p>
+    <svg class="ecg" viewBox="0 0 760 26" preserveAspectRatio="none"><path d="M0 13 H120 l8 0 l4 -9 l5 18 l4 -9 H300 l8 0 l4 -9 l5 18 l4 -9 H520 l8 0 l4 -9 l5 18 l4 -9 H760" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+    <div class="bar"><i style="width:${i/Q.length*100}%"></i></div>
+    <div class="meta"><span>Progress</span><span class="mono">${done} answered \u00b7 ${pct}% correct so far</span></div>`;
+}
+function pick(idx){if(answered[i]!==undefined)return;chosen[i]=idx;answered[i]=true;render();window.scrollTo({top:0,behavior:'smooth'});}
+function next(){i++;render();window.scrollTo({top:0,behavior:'smooth'});}
+function prev(){i--;render();window.scrollTo({top:0,behavior:'smooth'});}
+function summary(){
+  const byMod={};Q.forEach((q,k)=>{byMod[q.m]=byMod[q.m]||{c:0,n:0};byMod[q.m].n++;if(chosen[k]===q.a)byMod[q.m].c++;});
+  const correct=Q.filter((q,k)=>chosen[k]===q.a).length;const pct=Math.round(correct/Q.length*100);
+  const weak=Q.filter((q,k)=>chosen[k]!==q.a).map(q=>`${q.m.replace('Module ','M')}: ${q.t}`);
+  app.innerHTML=`<h1>Results</h1>
+    <svg class="ecg" viewBox="0 0 760 26" preserveAspectRatio="none"><path d="M0 13 H120 l8 0 l4 -9 l5 18 l4 -9 H300 l8 0 l4 -9 l5 18 l4 -9 H520 l8 0 l4 -9 l5 18 l4 -9 H760" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+    <div class="summary">
+      <div class="score">${correct}<small> / ${Q.length} \u00b7 ${pct}%</small></div>
+      <div class="mods">${Object.entries(byMod).map(([m,v])=>{const p=Math.round(v.c/v.n*100);return `<div class="modrow"><span class="nm">${m}</span><span class="bar" style="flex:0 0 140px"><i style="width:${p}%"></i></span><span class="pct mono">${v.c}/${v.n}</span></div>`;}).join('')}</div>
+      <div class="weak">${weak.length?`<h3>Revisit before Friday</h3><ul>${weak.map(w=>`<li>${w}</li>`).join('')}</ul>`:`<p class="nogap">No gaps. Strong across Modules 1\u20134 at this difficulty.</p>`}</div>
+      <div class="nav" style="margin-top:20px"><button class="btn" onclick="restart()">Retake</button></div>
+    </div>`;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function restart(){i=0;answered=[];chosen=[];render();}
+render();
+</script>
